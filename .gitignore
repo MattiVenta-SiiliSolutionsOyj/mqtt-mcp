@@ -1,3 +1,5 @@
+# Ignore local MQTT config
+mqtt-conf.json
 # Python-generated files
 __pycache__/
 *.py[oc]
@@ -8,3 +10,4 @@ wheels/
 
 # Virtual environments
 .venv
+mqtt_config_deflaut.json
