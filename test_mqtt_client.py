@@ -1,42 +1,56 @@
+
 import json
-from mqtt_client import MCPMQTTClient
-
 import os
-CONFIG_FILE = "mqtt-conf.json"
-DEFAULT_CONFIG_FILE = "mqtt-conf-default.json"
+import time
+import pytest
+import logging
+from mqtt_client import MCPMQTTClient
+logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] %(message)s')
 
-def get_config_file():
-    return CONFIG_FILE if os.path.exists(CONFIG_FILE) else DEFAULT_CONFIG_FILE
+import sys
 
-def load_config():
-    with open(get_config_file(), "r") as f:
-        return json.load(f)
-
-def main():
-    config = load_config()
-    print("Loaded config:", config)
-    print("MQTT Broker:", config["MQTT_BROKER"])
-    print("MQTT Port:", config["MQTT_PORT"])
-    print("MQTT Username:", config["MQTT_USERNAME"])
-    print("MQTT Password:", config["MQTT_PASSWORD"])
-    print("MQTT Client ID:", config["MQTT_CLIENT_ID"])
-    print("MQTT Test Topic:", config["MQTT_TEST_TOPIC"])
-
+@pytest.fixture(scope="module")
+def mqtt_client(request):
+    config_file = getattr(request, 'param', None)
+    broker = os.environ.get("MQTT_BROKER", "localhost")
+    port = int(os.environ.get("MQTT_PORT", 1883))
+    client_id = os.environ.get("MQTT_CLIENT_ID", "TestClient1")
+    username = os.environ.get("MQTT_USERNAME", None)
+    password = os.environ.get("MQTT_PASSWORD", None)
+    logging.info(f"Using MQTT broker: {broker}, port: {port}, client_id: {client_id}, username: {username}, password: {password}")
     client = MCPMQTTClient(
-        broker=config["MQTT_BROKER"],
-        port=config.get("MQTT_PORT", 1883),
-        client_id=config.get("MQTT_CLIENT_ID"),
-        username=config.get("MQTT_USERNAME"),
-        password=config.get("MQTT_PASSWORD")
+        broker=broker,
+        port=port,
+        client_id=client_id,
+        username=username,
+        password=password
     )
     client.connect()
-    client.subscribe(config.get("MQTT_TEST_TOPIC", "test/#"))
-    import time
-    time.sleep(5)  # Wait for messages
-    print("Subscribed topics:", client.get_subscribed_topics())
-    for topic in client.get_subscribed_topics():
-        print(f"Last message for {topic}: {client.get_last_message(topic)}")
+    yield client
     client.disconnect()
 
-if __name__ == "__main__":
-    main()
+@pytest.mark.parametrize("mqtt_client", [None], indirect=True)
+def test_publish_and_receive(mqtt_client):
+    import logging
+    logging.info("MQTT broker address: %s", mqtt_client.broker)
+    logging.info("MQTT broker port: %d", mqtt_client.port)
+    logging.info("MQTT client ID: %s", mqtt_client.client_id)
+    logging.info("MQTT username: %s", mqtt_client.username)
+    logging.info("MQTT password: %s", mqtt_client.password)
+
+    test_topic = "test/mcp/jeee"
+    mqtt_client.subscribe(test_topic)
+    # Publish several messages
+    for i in range(1, 6):
+        mqtt_client.publish(test_topic, f"{i}.Hello from MCPMQTTClient!")
+    time.sleep(5)  # Wait for messages to be received
+    messages = mqtt_client.get_all_received_messages(test_topic)[test_topic]
+    assert len(messages) == 5
+    # Check that the last message matches
+    last_msg = messages[-1][1]
+    assert last_msg == "5.Hello from MCPMQTTClient!"
+    mqtt_client.publish(test_topic, "Final message")
+    time.sleep(2)
+    messages = mqtt_client.get_all_received_messages(test_topic)[test_topic]
+    assert messages[-1][1] == "Final message"
+    assert len(messages) == 5
