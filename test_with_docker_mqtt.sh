@@ -4,7 +4,7 @@
 docker run -d --name local-mqtt-broker -p 1883:1883 -v "$PWD/mosquitto.conf:/mosquitto/config/mosquitto.conf" eclipse-mosquitto:2.0
 
 # Wait for the broker to be ready
-sleep 8
+sleep 1
 
 # Run the Python MQTT client test script with local broker parameters and log prints enabled
 

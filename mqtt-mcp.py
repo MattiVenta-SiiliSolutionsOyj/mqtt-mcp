@@ -112,7 +112,16 @@ def get_received_topics() -> str:
         return f"Received topics: {topics}"
     return "MQTT client is not connected."
 @mcp.tool()
-def get_all_received_messages(topic: str) -> str:
+def publish_value(topic: str, message: str) -> str:
+    """Publish a message to a topic."""
+    global mqtt_client_instance
+    if mqtt_client_instance:
+        mqtt_client_instance.publish(topic, message)
+        return f"Published message to topic '{topic}': {message}"
+    return "MQTT client is not connected."
+
+@mcp.tool()
+def get_all_received_values(topic: str) -> str:
         """Get all received messages (with timestamps) for a specific topic."""
         global mqtt_client_instance
         if mqtt_client_instance:
